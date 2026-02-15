@@ -1,56 +1,59 @@
-# TIMOTHY CORRADO
-Omaha, NE  
-TimothyCorrado@gmail.com | (402) 649-8672  
-linkedin.com/in/timothy-corrado | github.com/TimothyCorrado  
+# Timothy Corrado (Timmy)
+Omaha, NE • timothycorrado@gmail.com • (402) 649-8672  
+LinkedIn: linkedin.com/in/timothy-corrado • GitHub: github.com/TimothyCorrado  
 
-## PROFESSIONAL SUMMARY
-IT support professional with prior enterprise help desk experience and strong foundations in endpoint troubleshooting, user access management, and ticket-based incident resolution. CompTIA Security+ certified with hands-on experience in log review and system monitoring. Known for reliability, documentation discipline, and clear communication. Seeking an IT Support / Technical Support role with growth into systems and security operations.
+**IT Support Specialist | CompTIA Security+ | Active Directory • ServiceNow • Desktop & Endpoint Support | U.S. Marine Corps Veteran**
 
-## CORE SKILLS
-- IT Support & Operations (ticketing systems, escalation, documentation)
-- User Provisioning & Access Control (least privilege, permissions)
-- Windows Troubleshooting & Basic Linux Familiarity
-- Windows Event Logs & Monitoring Fundamentals
-- Networking Basics (DNS, TCP/IP, Wi-Fi troubleshooting)
-- PowerShell (basic), Python (basic)
-- Professional Communication & Confidentiality Awareness
+---
 
-## PROFESSIONAL EXPERIENCE
+## Summary
+Security+ certified IT Support Specialist with 7+ years of experience supporting Windows endpoints, managing Active Directory accounts, and resolving incidents in ticket-driven environments. Strong in troubleshooting, endpoint deployment, and ServiceNow documentation with a security-focused approach.
 
-### **Technical & IT Support Roles**
-C&A Industries | Daycos | Northeast Community College | 2013–2020
-- Supported enterprise users with login issues, account access requests, and endpoint troubleshooting.
-- Processed user provisioning and access changes while maintaining audit-ready documentation.
-- Managed and prioritized tickets to ensure timely resolution and proper escalation.
-- Contributed to secure IT operations through consistent documentation and process adherence.
+---
 
-### **Heavy Equipment Mechanic (Sergeant, E-5)**
-U.S. Marine Corps | 2016–2024
-- Applied structured troubleshooting methodology under time-sensitive conditions.
-- Maintained detailed operational documentation and compliance records.
-- Led small teams and ensured procedural accuracy and accountability.
-- Trusted with sensitive systems and operational data.
+## Core Skills
+Active Directory • ServiceNow • Desktop Support • IT Support • Windows 10/11 • Endpoint Deployment  
+User Provisioning • Password Resets • Hardware/Software Troubleshooting • TCP/IP • DNS • Microsoft 365  
 
-### **Additional Professional Experience**
-Mutual of Omaha | Alliance Medical Staffing | Lyft | Family Heritage | 2022–2026
-- Handled confidential financial and healthcare-related data.
-- Followed structured compliance procedures and policy guidelines.
-- Communicated clearly with customers and internal stakeholders.
+---
 
-## TECHNICAL PROJECT EXPERIENCE
+## Experience
 
-### **Windows Event Monitoring Lab**
-- Reviewed authentication events and login failures using Windows Event Viewer.
-- Practiced documenting simulated incident findings.
-- Strengthened troubleshooting skills by correlating system behavior with log data.
+**Technical Support / IT Support** — C&A Industries • Daycos • Northeast CC | 2013–2020  
+- Provided enterprise desktop support and resolved hardware, software, and access issues.  
+- Managed incidents in **ServiceNow** and documented resolutions.  
+- Administered **Active Directory** accounts, permissions, and password resets.  
+- Deployed and configured Windows workstations and applications.
 
-### **Firewall & Network Segmentation Lab**
-- Configured firewall rules enforcing least-privilege access.
-- Tested and validated connectivity issues to understand traffic flow and policy impact.
-- Reinforced foundational networking and troubleshooting skills.
+**Heavy Equipment Mechanic (Sergeant, E-5)** — U.S. Marine Corps | 2016–2024  
+- Diagnosed and repaired complex electronic systems using structured troubleshooting.  
+- Documented technical issues and ensured operational readiness of critical equipment.  
+- Led and trained personnel on technical maintenance procedures.
 
-## EDUCATION & CERTIFICATIONS
-- Bachelor of Science in Computer Science – University of Nebraska at Kearney | 2020  
-- Associate of Science in Computer Science – Northeast Community College | 2016  
-- CompTIA Security+ (SY0-701) – Earned November 2025  
-- CompTIA A+ – In Progress
+**Distribution Channel Management Analyst** — Mutual of Omaha | 2022–2026  
+- Maintained enterprise system records and resolved account and access issues.  
+- Ensured accurate documentation and data integrity.
+
+---
+
+## Technical Projects
+
+**Windows Event Log Analysis Lab**  
+- Investigated authentication failures and system errors using Event Viewer.
+
+**Mini SOC Detection Lab (Splunk + Sysmon)**  
+- Built lab to analyze logs and document incident investigation workflows.
+
+**pfSense Firewall Lab**  
+- Configured firewall rules and validated secure network segmentation.
+
+---
+
+## Education & Certifications
+**B.S., Computer Science** — University of Nebraska at Kearney  
+**CompTIA Security+**  
+**CompTIA A+** (In Progress)
+
+---
+
+**Target Roles:** IT Support Specialist • Desktop Support • Endpoint Support • IT Support Analyst

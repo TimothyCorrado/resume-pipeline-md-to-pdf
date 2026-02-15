@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """
-build_resume_onepage.py
+build_resume_onepage.py (production)
 
-Auto-fit a resume Markdown to ONE PAGE by iteratively:
-- generating tight DOCX
-- converting to PDF via LibreOffice
-- counting PDF pages
-- trimming low-priority content if needed
+Markdown resume -> ATS-safe DOCX -> PDF (LibreOffice), enforcing 1 page.
 
-Adds:
-- Email auto-linking (mailto:) for FULL email address
-- URL auto-linking (LinkedIn/GitHub/etc.)
-- Proper parsing of bold inside H3 (###) lines (no literal **)
-- Ignores Markdown horizontal rules (---)
-- Trim rules resilient to **bold** inside H3 titles
+Polish:
+- Clickable links (mailto/tel/https)
+- Clean contact line: Email | Phone | LinkedIn | GitHub
+- H3 headers bold (no literal **)
+- Ignore --- horizontal rules
+- Bullets with hanging indent + tight spacing
+- Trim rules resilient to **bold** in H3 titles
 
 Usage:
   python build_resume_onepage.py resume_helpdesk.md out.docx out.pdf
@@ -37,8 +34,9 @@ from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from pypdf import PdfReader
 
+
 # ----------------------------
-# Config: how to trim if >1 page
+# Trimming rules (only used if PDF > 1 page)
 # ----------------------------
 TRIM_RULES = [
     ("DROP_SECTION", "Other Professional Experience"),
@@ -50,57 +48,79 @@ TRIM_RULES = [
 ]
 
 # ----------------------------
-# Tight formatting knobs
+# Formatting presets (tries tighter if needed)
 # ----------------------------
 FMT_PRESETS = [
     dict(
         margin=0.50,
         body_pt=10.0,
         name_pt=13.0,
-        h2_pt=10.5,
-        h3_pt=10.0,
-        h2_before=4,
-        h2_after=1,
-        para_after=0,
+        h2_pt=10.6,
+        h3_pt=10.2,
+        h2_before=6,
+        h2_after=2,
+        h3_before=4,
+        h3_after=1,
+        para_after=1,
         bullet_after=0,
+        bullet_left=0.25,   # inches
+        bullet_hang=0.18,   # inches
     ),
     dict(
         margin=0.45,
         body_pt=9.8,
         name_pt=12.5,
-        h2_pt=10.2,
-        h3_pt=9.8,
-        h2_before=3,
-        h2_after=1,
+        h2_pt=10.4,
+        h3_pt=10.0,
+        h2_before=5,
+        h2_after=2,
+        h3_before=3,
+        h3_after=1,
         para_after=0,
         bullet_after=0,
+        bullet_left=0.25,
+        bullet_hang=0.18,
     ),
 ]
 
-# Markdown / parsing helpers
+# ----------------------------
+# Regex helpers
+# ----------------------------
 BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 H2_RE = re.compile(r"^##\s+(.+)$")
 H3_RE = re.compile(r"^###\s+(.+)$")
 BULLET_RE = re.compile(r"^\s*-\s+(.+)$")
-HR_RE = re.compile(r"^\s*-{3,}\s*$")  # --- horizontal rules
+HR_RE = re.compile(r"^\s*-{3,}\s*$")
 
-# EMAIL: match whole email token (bounded, not partial)
 EMAIL_RE = re.compile(r"(?P<email>[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})")
-
-# URL: match whole URL-like token; stop before common separators
-# - handles https://..., http://..., and bare domains like linkedin.com/in/...
+PHONE_RE = re.compile(
+    r"(?P<phone>(?:\+?1[\s\-\.]?)?(?:\(\d{3}\)|\d{3})[\s\-\.]?\d{3}[\s\-\.]?\d{4})"
+)
 URL_RE = re.compile(
     r"(?P<url>(?:https?://)?(?:www\.)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s|,)]+)?)"
 )
 
+
 def strip_md_bold(s: str) -> str:
     return re.sub(r"\*\*(.+?)\*\*", r"\1", s).strip()
+
 
 def normalize_url(url: str) -> str:
     u = url.strip()
     if u.startswith("http://") or u.startswith("https://"):
         return u
     return "https://" + u
+
+
+def normalize_tel(phone: str) -> str:
+    # Best effort E.164-ish for tel: links
+    digits = re.sub(r"\D", "", phone)
+    if len(digits) == 10:
+        digits = "1" + digits
+    if digits.startswith("1") and len(digits) == 11:
+        return f"+{digits}"
+    return digits
+
 
 def find_soffice() -> str:
     candidates = [
@@ -117,13 +137,35 @@ def find_soffice() -> str:
         return lo
     raise RuntimeError("LibreOffice not found. Install LibreOffice or add soffice to PATH.")
 
+
 def pdf_pages(pdf_path: Path) -> int:
-    reader = PdfReader(str(pdf_path))
-    return len(reader.pages)
+    return len(PdfReader(str(pdf_path)).pages)
+
 
 def md_read(md_path: Path) -> List[str]:
     return md_path.read_text(encoding="utf-8").splitlines()
 
+
+def normalize_whitespace(lines: List[str]) -> List[str]:
+    cleaned: List[str] = []
+    blank = 0
+    for ln in lines:
+        ln = re.sub(r"\s{2,}$", "", ln.rstrip())  # remove forced MD linebreak spaces
+        if HR_RE.match(ln):
+            continue
+        if ln.strip() == "":
+            blank += 1
+            if blank <= 1:
+                cleaned.append("")
+        else:
+            blank = 0
+            cleaned.append(ln)
+    return cleaned
+
+
+# ----------------------------
+# Trim logic
+# ----------------------------
 def drop_section(lines: List[str], section_title: str) -> List[str]:
     out: List[str] = []
     i = 0
@@ -138,6 +180,7 @@ def drop_section(lines: List[str], section_title: str) -> List[str]:
         out.append(line)
         i += 1
     return out
+
 
 def keep_only_projects(lines: List[str], keep_n: int) -> List[str]:
     out: List[str] = []
@@ -179,6 +222,7 @@ def keep_only_projects(lines: List[str], keep_n: int) -> List[str]:
 
     return out
 
+
 def trim_bullets_under(lines: List[str], header_title: str, keep_k: int) -> List[str]:
     out: List[str] = []
     i = 0
@@ -212,23 +256,22 @@ def trim_bullets_under(lines: List[str], header_title: str, keep_k: int) -> List
 
     return out
 
-def normalize_whitespace(lines: List[str]) -> List[str]:
-    cleaned: List[str] = []
-    blank = 0
-    for ln in lines:
-        ln = ln.rstrip()
-        ln = re.sub(r"\s{2,}$", "", ln)
-        if HR_RE.match(ln):
-            continue
-        if ln.strip() == "":
-            blank += 1
-            if blank <= 1:
-                cleaned.append("")
-        else:
-            blank = 0
-            cleaned.append(ln)
-    return cleaned
 
+def apply_trim_rule(lines: List[str], rule: Tuple) -> List[str]:
+    kind = rule[0]
+    if kind == "DROP_SECTION":
+        return drop_section(lines, rule[1])
+    if kind == "KEEP_ONLY_PROJECTS":
+        return keep_only_projects(lines, rule[1])
+    if kind == "TRIM_BULLETS_UNDER":
+        title, keep_k = rule[1]
+        return trim_bullets_under(lines, title, keep_k)
+    return lines
+
+
+# ----------------------------
+# Word hyperlink helpers
+# ----------------------------
 def add_hyperlink(paragraph, url: str, text: str, *, bold: bool = False, font_size: Optional[Pt] = None):
     part = paragraph.part
     r_id = part.relate_to(url, RT.HYPERLINK, is_external=True)
@@ -240,8 +283,7 @@ def add_hyperlink(paragraph, url: str, text: str, *, bold: bool = False, font_si
     rPr = OxmlElement("w:rPr")
 
     if bold:
-        b = OxmlElement("w:b")
-        rPr.append(b)
+        rPr.append(OxmlElement("w:b"))
 
     if font_size is not None:
         sz = OxmlElement("w:sz")
@@ -261,15 +303,13 @@ def add_hyperlink(paragraph, url: str, text: str, *, bold: bool = False, font_si
     hyperlink.append(new_run)
     paragraph._p.append(hyperlink)
 
-def add_text_with_bold_links_emails(p, text: str, *, default_font_size: Optional[Pt] = None, force_bold: bool = False):
+
+def add_runs_with_bold(p, text: str, *, force_bold: bool = False, font_size: Optional[Pt] = None):
     """
-    Adds runs to paragraph p supporting:
-    - **bold** segments
-    - FULL email linking (mailto:)
-    - URL linking
-    Priority: EMAIL matches first, then URL matches.
+    Adds text supporting **bold** and hyperlinks (email/phone/url).
+    Email > phone > url precedence for overlapping matches.
     """
-    # Split into bold vs non-bold segments first
+    # Split by **bold**
     segments = []
     last = 0
     for m in BOLD_RE.finditer(text):
@@ -285,66 +325,77 @@ def add_text_with_bold_links_emails(p, text: str, *, default_font_size: Optional
             return
         run = p.add_run(s)
         run.bold = force_bold or is_bold
-        if default_font_size is not None:
-            run.font.size = default_font_size
+        if font_size is not None:
+            run.font.size = font_size
 
     for is_bold_seg, seg in segments:
         seg = seg or ""
         i = 0
         while i < len(seg):
-            # Find next email or url
             em = EMAIL_RE.search(seg, i)
+            pm = PHONE_RE.search(seg, i)
             um = URL_RE.search(seg, i)
 
-            # Pick the earliest match (email wins ties)
-            next_m = None
-            kind = None
-            if em and um:
-                if em.start() <= um.start():
-                    next_m, kind = em, "email"
-                else:
-                    next_m, kind = um, "url"
-            elif em:
-                next_m, kind = em, "email"
-            elif um:
-                next_m, kind = um, "url"
-
-            if not next_m:
+            # Choose earliest; tie-break: email > phone > url
+            candidates = []
+            if em: candidates.append(("email", em.start(), em))
+            if pm: candidates.append(("phone", pm.start(), pm))
+            if um: candidates.append(("url", um.start(), um))
+            if not candidates:
                 add_plain(seg[i:], is_bold_seg)
                 break
 
-            # Add leading text before match
-            if next_m.start() > i:
-                add_plain(seg[i:next_m.start()], is_bold_seg)
+            candidates.sort(key=lambda x: (x[1], {"email": 0, "phone": 1, "url": 2}[x[0]]))
+            kind, start, m = candidates[0]
 
-            token = next_m.group(0)
+            if start > i:
+                add_plain(seg[i:start], is_bold_seg)
+
+            token = m.group(0)
+            bold = force_bold or is_bold_seg
 
             if kind == "email":
-                email = next_m.group("email")
-                add_hyperlink(
-                    p,
-                    f"mailto:{email}",
-                    email,
-                    bold=(force_bold or is_bold_seg),
-                    font_size=default_font_size,
-                )
+                email = m.group("email")
+                add_hyperlink(p, f"mailto:{email}", email, bold=bold, font_size=font_size)
+            elif kind == "phone":
+                phone = m.group("phone")
+                tel = normalize_tel(phone)
+                # Keep visible formatting; link uses tel: normalized
+                add_hyperlink(p, f"tel:{tel}", phone, bold=bold, font_size=font_size)
             else:
-                raw_url = next_m.group("url")
-                # Avoid linking emails as URLs (already handled), and ensure it's a plausible url token
+                raw_url = m.group("url")
                 if "@" in raw_url:
                     add_plain(raw_url, is_bold_seg)
                 else:
-                    url = normalize_url(raw_url)
-                    add_hyperlink(
-                        p,
-                        url,
-                        raw_url,
-                        bold=(force_bold or is_bold_seg),
-                        font_size=default_font_size,
-                    )
+                    add_hyperlink(p, normalize_url(raw_url), raw_url, bold=bold, font_size=font_size)
 
-            i = next_m.end()
+            i = m.end()
 
+
+# ----------------------------
+# Contact line normalization
+# ----------------------------
+def is_contact_block(lines: List[str], idx: int) -> bool:
+    # We expect after "# NAME" a few lines with location/contact.
+    # We'll normalize lines until we hit "## " or blank line after contact.
+    if idx < 0 or idx >= len(lines):
+        return False
+    return True
+
+
+def normalize_contact_lines(lines: List[str]) -> List[str]:
+    """
+    If the top area includes email/phone/linkedin/github, render a clean clickable contact line:
+      Email | Phone | LinkedIn | GitHub
+    This is done in DOCX creation stage by recognizing 'contact mode' lines.
+    Here we only return lines unchanged; the DOCX writer has special handling.
+    """
+    return lines
+
+
+# ----------------------------
+# DOCX creation
+# ----------------------------
 def md_to_docx(lines: List[str], docx_path: Path, fmt: dict):
     doc = Document()
     sec = doc.sections[0]
@@ -357,21 +408,133 @@ def md_to_docx(lines: List[str], docx_path: Path, fmt: dict):
     normal.font.name = "Calibri"
     normal.font.size = Pt(fmt["body_pt"])
 
-    for line in lines:
+    # Precompute bullet indent values
+    bullet_left = Inches(fmt["bullet_left"])
+    bullet_hang = Inches(fmt["bullet_hang"])
+
+    # Contact normalization state:
+    in_header_block = False
+    header_lines: List[str] = []
+
+    def flush_header_block():
+        nonlocal header_lines, in_header_block
+        if not header_lines:
+            return
+
+        # Build one or two header lines:
+        # - location line stays as plain text
+        # - contact line becomes Email | Phone | LinkedIn | GitHub (clickable)
+        # We’ll parse tokens across header_lines.
+        text = " ".join(header_lines)
+        # Extract
+        email = EMAIL_RE.search(text)
+        phone = PHONE_RE.search(text)
+        urls = URL_RE.findall(text)
+
+        # Identify LinkedIn/GitHub (best effort)
+        linkedin = None
+        github = None
+        other_urls = []
+
+        for u in urls:
+            u_norm = u.lower()
+            if "linkedin.com" in u_norm and linkedin is None:
+                linkedin = u
+            elif "github.com" in u_norm and github is None:
+                github = u
+            else:
+                other_urls.append(u)
+
+        # First line: try to keep a location line if present
+        # (heuristic: first header line often is "Omaha, NE")
+        # We'll just print the first header line that doesn't contain email/phone/url.
+        location_line = None
+        for hl in header_lines:
+            if (EMAIL_RE.search(hl) is None) and (PHONE_RE.search(hl) is None) and (URL_RE.search(hl) is None):
+                location_line = hl.strip()
+                break
+
+        if location_line:
+            p = doc.add_paragraph()
+            add_runs_with_bold(p, location_line, force_bold=False)
+            p.paragraph_format.space_after = Pt(0)
+
+        # Contact line: Email | Phone | LinkedIn | GitHub
+        parts = []
+        if email:
+            parts.append(("email", email.group("email")))
+        if phone:
+            parts.append(("phone", phone.group("phone")))
+        if linkedin:
+            parts.append(("url", linkedin))
+        if github:
+            parts.append(("url", github))
+
+        # If nothing extracted, just output original lines
+        if not parts:
+            for hl in header_lines:
+                p = doc.add_paragraph()
+                add_runs_with_bold(p, hl.strip(), force_bold=False)
+                p.paragraph_format.space_after = Pt(0)
+        else:
+            p = doc.add_paragraph()
+            # Build clickable chunks with separators
+            first = True
+            for kind, val in parts:
+                if not first:
+                    run = p.add_run(" | ")
+                    run.bold = False
+                first = False
+
+                if kind == "email":
+                    add_hyperlink(p, f"mailto:{val}", val, bold=False, font_size=None)
+                elif kind == "phone":
+                    add_hyperlink(p, f"tel:{normalize_tel(val)}", val, bold=False, font_size=None)
+                else:
+                    label = "LinkedIn" if linkedin and val == linkedin else ("GitHub" if github and val == github else val)
+                    add_hyperlink(p, normalize_url(val), label, bold=False, font_size=None)
+
+            p.paragraph_format.space_after = Pt(2)
+
+        header_lines = []
+        in_header_block = False
+
+    for i, line in enumerate(lines):
         line = line.rstrip()
         if not line.strip():
+            # if we're in header block, stop it on blank line
+            if in_header_block:
+                flush_header_block()
             continue
         if HR_RE.match(line):
             continue
 
+        # Name line starts header parsing
         if line.startswith("# "):
+            # flush any previous header (shouldn’t happen)
+            if in_header_block:
+                flush_header_block()
+
             p = doc.add_paragraph()
             r = p.add_run(line[2:].strip())
             r.bold = True
             r.font.size = Pt(fmt["name_pt"])
-            p.paragraph_format.space_after = Pt(2)
+            p.paragraph_format.space_after = Pt(1)
+
+            in_header_block = True
+            header_lines = []
             continue
 
+        # Capture header block lines until first ## section
+        if in_header_block:
+            if line.startswith("## "):
+                flush_header_block()
+                # fall through to section rendering
+            else:
+                header_lines.append(line.strip())
+                continue
+
+        # Sections
         if line.startswith("## "):
             p = doc.add_paragraph()
             r = p.add_run(line[3:].strip())
@@ -381,27 +544,36 @@ def md_to_docx(lines: List[str], docx_path: Path, fmt: dict):
             p.paragraph_format.space_after = Pt(fmt["h2_after"])
             continue
 
+        # Subheaders (roles/projects) - bold always
         if line.startswith("### "):
             p = doc.add_paragraph()
             title = line[4:].strip()
-            add_text_with_bold_links_emails(
-                p, title, default_font_size=Pt(fmt["h3_pt"]), force_bold=True
-            )
-            p.paragraph_format.space_before = Pt(2)
-            p.paragraph_format.space_after = Pt(0)
+            add_runs_with_bold(p, title, force_bold=True, font_size=Pt(fmt["h3_pt"]))
+            p.paragraph_format.space_before = Pt(fmt["h3_before"])
+            p.paragraph_format.space_after = Pt(fmt["h3_after"])
             continue
 
+        # Bullets with hanging indent
         if line.startswith("- "):
             p = doc.add_paragraph(style="List Bullet")
-            add_text_with_bold_links_emails(p, line[2:].strip())
-            p.paragraph_format.space_after = Pt(fmt["bullet_after"])
+            add_runs_with_bold(p, line[2:].strip(), force_bold=False, font_size=None)
+            pf = p.paragraph_format
+            pf.left_indent = bullet_left
+            pf.first_line_indent = -bullet_hang
+            pf.space_after = Pt(fmt["bullet_after"])
             continue
 
+        # Normal paragraphs (links enabled)
         p = doc.add_paragraph()
-        add_text_with_bold_links_emails(p, line.strip())
+        add_runs_with_bold(p, line.strip(), force_bold=False, font_size=None)
         p.paragraph_format.space_after = Pt(fmt["para_after"])
 
+    # flush header if file ends before a section
+    if in_header_block:
+        flush_header_block()
+
     doc.save(str(docx_path))
+
 
 def docx_to_pdf(docx_path: Path, pdf_path: Path):
     soffice = find_soffice()
@@ -425,16 +597,6 @@ def docx_to_pdf(docx_path: Path, pdf_path: Path):
     if generated.resolve() != pdf_path.resolve():
         generated.replace(pdf_path)
 
-def apply_trim_rule(lines: List[str], rule: Tuple) -> List[str]:
-    kind = rule[0]
-    if kind == "DROP_SECTION":
-        return drop_section(lines, rule[1])
-    if kind == "KEEP_ONLY_PROJECTS":
-        return keep_only_projects(lines, rule[1])
-    if kind == "TRIM_BULLETS_UNDER":
-        title, keep_k = rule[1]
-        return trim_bullets_under(lines, title, keep_k)
-    return lines
 
 def main():
     if len(sys.argv) != 4:
@@ -449,13 +611,13 @@ def main():
         print(f"Markdown not found: {md_path}")
         sys.exit(1)
 
-    lines = normalize_whitespace(md_read(md_path))
-
+    base_lines = normalize_whitespace(md_read(md_path))
     attempts = 0
 
     for fmt in FMT_PRESETS:
-        cur = list(lines)
+        cur = list(base_lines)
 
+        # Try without trimming first
         md_to_docx(cur, docx_path, fmt)
         docx_to_pdf(docx_path, pdf_path)
         pages = pdf_pages(pdf_path)
@@ -465,9 +627,9 @@ def main():
             print(f"OK: 1 page (no trimming). Attempts: {attempts}")
             return
 
+        # Apply trim rules until 1 page
         for rule in TRIM_RULES:
-            cur = apply_trim_rule(cur, rule)
-            cur = normalize_whitespace(cur)
+            cur = normalize_whitespace(apply_trim_rule(cur, rule))
 
             md_to_docx(cur, docx_path, fmt)
             docx_to_pdf(docx_path, pdf_path)
@@ -481,6 +643,7 @@ def main():
     print("Could not reach 1 page with current rules.")
     print("Last output was generated anyway; consider trimming one more bullet under IT Support Roles.")
     sys.exit(3)
+
 
 if __name__ == "__main__":
     main()
